@@ -144,5 +144,32 @@ document
 document
     .querySelector(".flash-zip-button")
     .addEventListener("click", flashDownloadedFactoryZip);
+// 解锁BL按钮
+document.querySelector('.unlock-bl-button').addEventListener('click', async () => {
+  if (!device) return statusField.textContent = "请先连接设备！";
+  statusField.textContent = "正在解锁BL...请在设备上确认！";
+  try {
+    await device.runCommand('flashing unlock');
+    statusField.textContent = "BL解锁指令已发送，请等待设备完成！";
+  } catch (err) {
+    statusField.textContent = `BL解锁失败：${err.message}`;
+  }
+});
 
+// 上锁BL按钮
+document.querySelector('.lock-bl-button').addEventListener('click', async () => {
+  if (!device) return statusField.textContent = "请先连接设备！";
+  statusField.textContent = "正在上锁BL...请在设备上确认！";
+  try {
+    await device.runCommand('flashing lock');
+    statusField.textContent = "BL上锁指令已发送，请等待设备完成！";
+  } catch (err) {
+    statusField.textContent = `BL上锁失败：${err.message}`;
+  }
+});
+
+// 连接设备成功后启用BL按钮
+// 在connect-button的click事件中，连接成功后添加：
+document.querySelector('.unlock-bl-button').disabled = false;
+document.querySelector('.lock-bl-button').disabled = false;
 // @license-end
