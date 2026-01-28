@@ -5,7 +5,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* 简单美化，提升操作体验 */
         body {
             font-family: Arial, sans-serif;
             max-width: 600px;
@@ -49,6 +48,9 @@
             border-radius: 4px;
             overflow-x: auto;
         }
+        .bl-buttons button {
+            margin-right: 10px;
+        }
     </style>
     <!-- 引入文件（注意路径和你的实际文件对应） -->
     <script src="../dist/fastboot.mjs" type="module"></script>
@@ -61,6 +63,10 @@
     <div class="section">
         <p>状态：<span class="status-field">未连接设备</span></p>
         <button class="connect-button">连接Fastboot设备</button>
+        <div class="bl-buttons">
+            <button class="unlock-bl-button" disabled>解锁BL</button>
+            <button class="lock-bl-button" disabled>上锁BL</button>
+        </div>
     </div>
 
     <hr>
@@ -78,18 +84,7 @@
 
     <hr>
 
-    <!-- 3. 临时启动镜像区 -->
-    <div class="section">
-        <form class="boot-form">
-            <label>临时启动镜像：</label>
-            <input type="file" name="boot-file" class="boot-file" accept=".img" />
-            <input type="submit" value="启动镜像" />
-            <small>（仅临时启动）</small>
-        </form>
-    </div>
-
-    <hr>
-
+    <!-- 调整顺序：先刷写分区，后临时启动 -->
     <!-- 4. 刷写分区区 -->
     <div class="section">
         <form class="flash-form">
@@ -99,6 +94,18 @@
             <label>目标分区：</label>
             <input type="text" name="flash-partition" class="flash-partition" placeholder="例如：boot" />
             <input type="submit" value="刷写分区" />
+        </form>
+    </div>
+
+    <hr>
+
+    <!-- 3. 临时启动镜像区 -->
+    <div class="section">
+        <form class="boot-form">
+            <label>临时启动镜像：</label>
+            <input type="file" name="boot-file" class="boot-file" accept=".img" />
+            <input type="submit" value="启动镜像" />
+            <small>（仅临时启动）</small>
         </form>
     </div>
 
