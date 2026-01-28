@@ -48,18 +48,25 @@
             border-radius: 4px;
             overflow-x: auto;
         }
-        .bl-buttons button {
-            margin-right: 10px;
+        /* 底部小字样式 */
+        .footer {
+            margin-top: 30px;
+            text-align: center;
+            color: #666;
+            font-size: 12px;
+        }
+        .footer a {
+            color: #666;
+            text-decoration: underline;
         }
     </style>
-    <!-- 引入文件（注意路径和你的实际文件对应） -->
     <script src="../dist/fastboot.mjs" type="module"></script>
     <script src="ui.js" type="module"></script>
 </head>
 <body>
     <h1>Fastboot刷写工具</h1>
 
-    <!-- 1. 设备连接区 -->
+    <!-- 设备连接区 -->
     <div class="section">
         <p>状态：<span class="status-field">未连接设备</span></p>
         <button class="connect-button">连接Fastboot设备</button>
@@ -67,7 +74,7 @@
 
     <hr>
 
-    <!-- 2. 命令发送区 -->
+    <!-- 命令发送区 -->
     <div class="section">
         <form class="command-form">
             <label>Fastboot命令：</label>
@@ -79,7 +86,8 @@
     </div>
 
     <hr>
-    <!-- 4. 刷写分区区 -->
+
+    <!-- 刷写分区区 -->
     <div class="section">
         <form class="flash-form">
             <label>选择刷写镜像：</label>
@@ -93,7 +101,7 @@
 
     <hr>
 
-    <!-- 3. 临时启动镜像区 -->
+    <!-- 临时启动镜像区 -->
     <div class="section">
         <form class="boot-form">
             <label>临时启动镜像：</label>
@@ -101,6 +109,11 @@
             <input type="submit" value="启动镜像" />
             <small>（仅临时启动）</small>
         </form>
+    </div>
+
+    <!-- 底部小字 -->
+    <div class="footer">
+        修改自 <a href="https://github.com/kdrag0n/fastboot.js/" target="_blank" rel="noopener noreferrer">https://github.com/kdrag0n/fastboot.js/</a>
     </div>
 
 </body>
