@@ -1,175 +1,150 @@
 // @license magnet:?xt=urn:btih:d3d9a9a6595521f9666a5e94cc830dab83b65699&dn=expat.txt MIT
 
 import * as fastboot from "../dist/fastboot.mjs";
-import { BlobStore } from "./download.js";
 
-let device = new fastboot.FastbootDevice();
-window.device = device;
-let blobStore = new BlobStore();
+// 全局设备实例 + 状态元素
+let device = null;
+const statusField = document.querySelector(".status-field");
+const resultField = document.querySelector(".result-field");
 
-// Enable verbose debug logging
-fastboot.setDebugLevel(2);
 
-async function connectDevice() {
-    let statusField = document.querySelector(".status-field");
-    statusField.textContent = "Connecting...";
+// 初始化：设置基础配置
+fastboot.setDebugLevel(1); // 降低日志级别，减少干扰
 
-    try {
-        await device.connect();
-    } catch (error) {
-        statusField.textContent = `Failed to connect to device: ${error.message}`;
-        return;
-    }
 
-    let product = await device.getVariable("product");
-    let serial = await device.getVariable("serialno");
-    let status = `Connected to ${product} (serial: ${serial})`;
-    statusField.textContent = status;
-}
+// 1. 连接设备
+document.querySelector(".connect-button").addEventListener("click", async () => {
+  statusField.textContent = "正在连接设备...";
+  try {
+    device = new fastboot.FastbootDevice();
+    await device.connect();
+    // 连接成功后自动获取设备信息
+    const [product, serial] = await Promise.all([
+      device.getVariable("product"),
+      device.getVariable("serialno")
+    ]);
+    statusField.textContent = `已连接：${product}（SN：${serial}）`;
+    resultField.textContent = "设备连接成功！";
 
-async function sendFormCommand(event) {
-    event.preventDefault();
-
-    let inputField = document.querySelector(".command-input");
-    let command = inputField.value;
-    let result = (await device.runCommand(command)).text;
-    document.querySelector(".result-field").textContent = result;
-    inputField.value = "";
-}
-
-async function bootFormFile(event) {
-    event.preventDefault();
-
-    let fileField = document.querySelector(".boot-file");
-    let file = fileField.files[0];
-    await device.bootBlob(file);
-    fileField.value = "";
-}
-
-async function flashFormFile(event) {
-    event.preventDefault();
-
-    let fileField = document.querySelector(".flash-file");
-    let partField = document.querySelector(".flash-partition");
-    let file = fileField.files[0];
-    await device.flashBlob(partField.value, file);
-    fileField.value = "";
-    partField.value = "";
-}
-
-async function downloadZip() {
-    let statusField = document.querySelector(".factory-status-field");
-    statusField.textContent = "Downloading...";
-
-    await blobStore.init();
-    try {
-        await blobStore.download("/releases/taimen-factory-2021.01.06.14.zip");
-    } catch (error) {
-        statusField.textContent = `Failed to download zip: ${error.message}`;
-        throw error;
-    }
-
-    statusField.textContent = "Downloaded";
-}
-
-function reconnectCallback() {
-    let reconnectButton = document.querySelector(".reconnect-button");
-    reconnectButton.style.display = "block";
-    reconnectButton.onclick = async () => {
-        await device.connect();
-        reconnectButton.style.display = "none";
-    };
-}
-
-async function flashFactoryZip(blob) {
-    let statusField = document.querySelector(".factory-status-field");
-    statusField.textContent = "Flashing...";
-
-    let progressBar = document.querySelector(".factory-progress-bar");
-
-    try {
-        await device.flashFactoryZip(
-            blob,
-            false,
-            reconnectCallback,
-            // Progress callback
-            (action, item, progress) => {
-                let userAction = fastboot.USER_ACTION_MAP[action];
-                statusField.textContent = `${userAction} ${item}`;
-                progressBar.value = progress;
-            }
-        );
-    } catch (error) {
-        statusField.textContent = `Failed to flash zip: ${error.message}`;
-        throw error;
-    }
-
-    statusField.textContent = "Successfully flashed factory images";
-}
-
-async function flashSelectedFactoryZip(event) {
-    event.preventDefault();
-
-    let fileField = document.querySelector(".factory-file");
-    await flashFactoryZip(fileField.files[0]);
-    fileField.value = "";
-}
-
-async function flashDownloadedFactoryZip() {
-    await blobStore.init();
-    let blob = await blobStore.loadFile("taimen-factory-2021.01.06.14.zip");
-    await flashFactoryZip(blob);
-}
-
-fastboot.configureZip({
-    workerScripts: {
-        inflate: ["../dist/vendor/z-worker-pako.js", "pako_inflate.min.js"],
-    },
+    document.querySelector(".unlock-bl-button").disabled = false;
+    document.querySelector(".lock-bl-button").disabled = false;
+  } catch (err) {
+    statusField.textContent = `连接失败：${err.message}`;
+    device = null;
+    // 连接失败
+    document.querySelector(".unlock-bl-button").disabled = true;
+    document.querySelector(".lock-bl-button").disabled = true;
+  }
 });
 
-document
-    .querySelector(".command-form")
-    .addEventListener("submit", sendFormCommand);
-document
-    .querySelector(".connect-button")
-    .addEventListener("click", connectDevice);
-document.querySelector(".boot-form").addEventListener("submit", bootFormFile);
-document.querySelector(".flash-form").addEventListener("submit", flashFormFile);
-document
-    .querySelector(".download-zip-button")
-    .addEventListener("click", downloadZip);
-document
-    .querySelector(".factory-form")
-    .addEventListener("submit", flashSelectedFactoryZip);
-document
-    .querySelector(".flash-zip-button")
-    .addEventListener("click", flashDownloadedFactoryZip);
-// 解锁BL按钮
-document.querySelector('.unlock-bl-button').addEventListener('click', async () => {
+
+// 2. 解锁BL
+document.querySelector(".unlock-bl-button").addEventListener("click", async () => {
   if (!device) return statusField.textContent = "请先连接设备！";
-  statusField.textContent = "正在解锁BL...请在设备上确认！";
+  statusField.textContent = "正在解锁BL...请在设备上确认操作！";
   try {
-    await device.runCommand('flashing unlock');
-    statusField.textContent = "BL解锁指令已发送，请等待设备完成！";
+    const result = await device.runCommand("flashing unlock");
+    statusField.textContent = "BL解锁指令已发送，设备将自动重启完成解锁！";
+    resultField.textContent = `解锁结果：\n${result.text}`;
   } catch (err) {
     statusField.textContent = `BL解锁失败：${err.message}`;
   }
 });
 
-// 上锁BL按钮
-document.querySelector('.lock-bl-button').addEventListener('click', async () => {
+
+// 3. 上锁BL
+document.querySelector(".lock-bl-button").addEventListener("click", async () => {
   if (!device) return statusField.textContent = "请先连接设备！";
-  statusField.textContent = "正在上锁BL...请在设备上确认！";
+  statusField.textContent = "正在上锁BL...请在设备上确认操作！";
   try {
-    await device.runCommand('flashing lock');
-    statusField.textContent = "BL上锁指令已发送，请等待设备完成！";
+    const result = await device.runCommand("flashing lock");
+    statusField.textContent = "BL上锁指令已发送，设备将自动重启完成上锁！";
+    resultField.textContent = `上锁结果：\n${result.text}`;
   } catch (err) {
     statusField.textContent = `BL上锁失败：${err.message}`;
   }
 });
 
-// 连接设备成功后启用BL按钮
-// 在connect-button的click事件中，连接成功后添加：
-document.querySelector('.unlock-bl-button').disabled = false;
-document.querySelector('.lock-bl-button').disabled = false;
+
+// 4. 发送Fastboot命令
+document.querySelector(".command-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!device) return statusField.textContent = "请先连接设备！";
+
+  const cmd = document.querySelector(".command-input").value.trim();
+  if (!cmd) return resultField.textContent = "请输入Fastboot命令！";
+
+  resultField.textContent = `执行命令：${cmd}...`;
+  try {
+    const res = await device.runCommand(cmd);
+    resultField.textContent = `命令结果：\n${res.text}`;
+  } catch (err) {
+    resultField.textContent = `命令执行失败：${err.message}`;
+  }
+  document.querySelector(".command-input").value = ""; // 清空输入框
+});
+
+
+// 5. 刷写分区功能
+document.querySelector(".flash-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!device) return statusField.textContent = "请先连接设备！";
+
+  const file = document.querySelector(".flash-file").files[0];
+  const partition = document.querySelector(".flash-partition").value.trim();
+  if (!file) return resultField.textContent = "请选择要刷写的镜像文件！";
+  if (!partition) return resultField.textContent = "请输入目标分区名（例如：boot）！";
+
+  statusField.textContent = `正在刷写分区 ${partition}（文件：${file.name}）...`;
+  resultField.textContent = "刷写中，请等待完成...";
+  try {
+    await device.flashBlob(partition, file, (progress) => {
+      resultField.textContent = `刷写进度：${Math.round(progress * 100)}%`;
+    });
+    statusField.textContent = `分区 ${partition} 刷写完成！`;
+    resultField.textContent = `成功刷写镜像到 ${partition} 分区`;
+  } catch (err) {
+    statusField.textContent = `刷写失败：${err.message}`;
+  }
+  // 清空选择
+  document.querySelector(".flash-file").value = "";
+  document.querySelector(".flash-partition").value = "";
+});
+
+
+// 6. 临时启动镜像功能
+document.querySelector(".boot-form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  if (!device) return statusField.textContent = "请先连接设备！";
+
+  const file = document.querySelector(".boot-file").files[0];
+  if (!file) return resultField.textContent = "请选择要临时启动的镜像文件！";
+
+  statusField.textContent = `正在临时启动镜像：${file.name}...`;
+  resultField.textContent = "启动指令发送中，请等待设备重启...";
+  try {
+    await device.bootBlob(file);
+    statusField.textContent = `临时启动指令已发送，设备将重启并启动该镜像！`;
+  } catch (err) {
+    statusField.textContent = `临时启动失败：${err.message}`;
+  }
+  document.querySelector(".boot-file").value = ""; // 清空文件选择
+});
+
+
+// 隐藏不需要的工厂镜像功能（若有）
+const factoryElements = [
+  ".factory-form",
+  ".download-zip-button",
+  ".flash-zip-button",
+  ".factory-status-field",
+  ".factory-progress-bar",
+  ".reconnect-button",
+  ".factory-flash-log"
+];
+factoryElements.forEach(selector => {
+  const el = document.querySelector(selector);
+  if (el) el.style.display = "none";
+});
+
 // @license-end
