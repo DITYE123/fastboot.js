@@ -18,7 +18,6 @@ async function connectDevice() {
         await device.connect();
     } catch (error) {
         statusField.textContent = `Failed to connect to device: ${error.message}`;
-        // 连接失败时禁用BL按钮
         document.querySelector(".unlock-bl-button").disabled = true;
         document.querySelector(".lock-bl-button").disabled = true;
         return;
@@ -28,12 +27,10 @@ async function connectDevice() {
     let serial = await device.getVariable("serialno");
     let status = `Connected to ${product} (serial: ${serial})`;
     statusField.textContent = status;
-    // 连接成功后启用BL按钮
     document.querySelector(".unlock-bl-button").disabled = false;
     document.querySelector(".lock-bl-button").disabled = false;
 }
 
-// 解锁BL功能
 async function unlockBL() {
     let statusField = document.querySelector(".status-field");
     if (!device) {
@@ -47,10 +44,10 @@ async function unlockBL() {
         document.querySelector(".result-field").textContent = result;
     } catch (error) {
         statusField.textContent = `Failed to unlock BL: ${error.message}`;
+        document.querySelector(".result-field").textContent = error.message;
     }
 }
 
-// 上锁BL功能
 async function lockBL() {
     let statusField = document.querySelector(".status-field");
     if (!device) {
@@ -64,17 +61,42 @@ async function lockBL() {
         document.querySelector(".result-field").textContent = result;
     } catch (error) {
         statusField.textContent = `Failed to lock BL: ${error.message}`;
+        document.querySelector(".result-field").textContent = error.message;
     }
 }
 
+// 修复命令输入功能：添加校验+错误处理
 async function sendFormCommand(event) {
     event.preventDefault();
 
     let inputField = document.querySelector(".command-input");
-    let command = inputField.value;
-    let result = (await device.runCommand(command)).text;
-    document.querySelector(".result-field").textContent = result;
-    inputField.value = "";
+    let command = inputField.value.trim(); // 去除首尾空格
+    let resultField = document.querySelector(".result-field");
+    let statusField = document.querySelector(".status-field");
+
+    // 校验：命令为空
+    if (!command) {
+        resultField.textContent = "Error: Please enter a command!";
+        return;
+    }
+    // 校验：设备未连接
+    if (!device) {
+        statusField.textContent = "Error: Device not connected!";
+        resultField.textContent = "Please connect device first!";
+        return;
+    }
+
+    statusField.textContent = `Executing command: ${command}`;
+    resultField.textContent = "Running...";
+    try {
+        let result = (await device.runCommand(command)).text;
+        resultField.textContent = result;
+        statusField.textContent = "Command executed successfully";
+    } catch (error) {
+        resultField.textContent = `Command failed: ${error.message}`;
+        statusField.textContent = "Command execution failed";
+    }
+    inputField.value = ""; // 清空输入框
 }
 
 async function bootFormFile(event) {
@@ -82,7 +104,29 @@ async function bootFormFile(event) {
 
     let fileField = document.querySelector(".boot-file");
     let file = fileField.files[0];
-    await device.bootBlob(file);
+    let statusField = document.querySelector(".status-field");
+    let resultField = document.querySelector(".result-field");
+
+    if (!device) {
+        statusField.textContent = "Error: Device not connected!";
+        resultField.textContent = "Please connect device first!";
+        return;
+    }
+    if (!file) {
+        resultField.textContent = "Error: Please select a file!";
+        return;
+    }
+
+    statusField.textContent = `Booting file: ${file.name}`;
+    resultField.textContent = "Booting...";
+    try {
+        await device.bootBlob(file);
+        resultField.textContent = "Boot command sent! Device will reboot.";
+        statusField.textContent = "Boot successful";
+    } catch (error) {
+        resultField.textContent = `Boot failed: ${error.message}`;
+        statusField.textContent = "Boot failed";
+    }
     fileField.value = "";
 }
 
@@ -92,7 +136,34 @@ async function flashFormFile(event) {
     let fileField = document.querySelector(".flash-file");
     let partField = document.querySelector(".flash-partition");
     let file = fileField.files[0];
-    await device.flashBlob(partField.value, file);
+    let partition = partField.value.trim();
+    let statusField = document.querySelector(".status-field");
+    let resultField = document.querySelector(".result-field");
+
+    if (!device) {
+        statusField.textContent = "Error: Device not connected!";
+        resultField.textContent = "Please connect device first!";
+        return;
+    }
+    if (!file) {
+        resultField.textContent = "Error: Please select a file!";
+        return;
+    }
+    if (!partition) {
+        resultField.textContent = "Error: Please enter a partition name!";
+        return;
+    }
+
+    statusField.textContent = `Flashing ${partition} with ${file.name}`;
+    resultField.textContent = "Flashing...";
+    try {
+        await device.flashBlob(partition, file);
+        resultField.textContent = `Successfully flashed ${partition}`;
+        statusField.textContent = "Flash successful";
+    } catch (error) {
+        resultField.textContent = `Flash failed: ${error.message}`;
+        statusField.textContent = "Flash failed";
+    }
     fileField.value = "";
     partField.value = "";
 }
@@ -132,7 +203,6 @@ async function flashFactoryZip(blob) {
             blob,
             false,
             reconnectCallback,
-            // Progress callback
             (action, item, progress) => {
                 let userAction = fastboot.USER_ACTION_MAP[action];
                 statusField.textContent = `${userAction} ${item}`;
@@ -184,8 +254,6 @@ document
 document
     .querySelector(".flash-zip-button")
     .addEventListener("click", flashDownloadedFactoryZip);
-
-// 绑定BL按钮事件
 document.querySelector(".unlock-bl-button").addEventListener("click", unlockBL);
 document.querySelector(".lock-bl-button").addEventListener("click", lockBL);
 
